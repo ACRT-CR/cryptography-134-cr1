@@ -593,7 +593,7 @@ class TestPKCS12Creation:
         if enc_alg is not None:
             builder = builder.key_cert_algorithm(enc_alg)
         if mac_alg is not None:
-            builder = builder.mac_algorithm(mac_alg)
+            builder = builder.hmac_hash(mac_alg)
         if iters is not None:
             builder = builder.kdf_rounds(iters)
 
@@ -669,7 +669,7 @@ class TestPKCS12Creation:
         [
             serialization.PrivateFormat.PKCS12.encryption_builder()
             .key_cert_algorithm(PBES.PBESv1SHA1And3KeyTripleDESCBC)
-            .mac_algorithm(hashes.SHA256())
+            .hmac_hash(hashes.SHA256())
             .build(b"password"),
         ],
     )
@@ -680,6 +680,24 @@ class TestPKCS12Creation:
         with pytest.raises(UnsupportedAlgorithm):
             serialize_key_and_certificates(
                 b"name", cakey, cacert, [], algorithm
+            )
+
+    @pytest.mark.supported(
+        only_if=lambda backend: backend._lib.Cryptography_HAS_PKCS12_SET_MAC,
+        skip_message="Requires OpenSSL with PKCS12_set_mac",
+    )
+    def test_set_mac_key_certificate_mismatch(self, backend):
+        cacert, _ = _load_ca(backend)
+        key = ec.generate_private_key(ec.SECP256R1())
+        encryption = (
+            serialization.PrivateFormat.PKCS12.encryption_builder()
+            .hmac_hash(hashes.SHA256())
+            .build(b"password")
+        )
+
+        with pytest.raises(ValueError):
+            serialize_key_and_certificates(
+                b"name", key, cacert, [], encryption
             )
 
 
